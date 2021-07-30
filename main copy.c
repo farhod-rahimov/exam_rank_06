@@ -227,8 +227,8 @@ int main(int argc, char ** argv) {
                 tmp->next = ft_create_new_client(tmp, fd, last_id++);
             }
             current = tmp;
-            sprintf(buf, "server: client %d just arrived\n", last_id - 1);
             for (; tmp != NULL; tmp = tmp->prev) {
+                sprintf(buf, "server: client %d just arrived\n", last_id - 1);
                 ft_add_new_send_msg(tmp, buf, 0);
             }
             tmp = current;
@@ -269,8 +269,10 @@ int main(int argc, char ** argv) {
                     for (; tmp != NULL && tmp->prev != NULL; tmp = tmp->prev) {}
                     head = tmp;
                     sprintf(buf, "server: client %d just left\n", tmp_id);
+                    int a = 0;
                     for (; tmp != NULL; tmp = tmp->next) {
                         ft_add_new_send_msg(tmp, buf, 0);
+                        printf("%d\n",++a);
                     }
                     tmp = current;
                     continue ;
@@ -290,10 +292,8 @@ int main(int argc, char ** argv) {
             if (FD_ISSET(fd, &writefds)) {
                 already_sent = strlen(tmp->send_msg) - tmp->remained_send;
                 ret = send(tmp->fd, tmp->send_msg + already_sent, tmp->remained_send, 0);
-                if (ret != -1)
-                    tmp->remained_send -= ret;
+                tmp->remained_send -= ret;
                 if (tmp->remained_send <= 0) {
-                    printf("LJACMLADSMCKLADSM | %s\n", tmp->read_msg);
                     free(tmp->send_msg);
                     tmp->send_msg = NULL;
                 }
