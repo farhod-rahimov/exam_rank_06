@@ -243,6 +243,7 @@ int main(int argc, char **argv) {
                         }
                         tmp = current;
                         tmp = tmp->next;
+                        close(fd);
                         continue ;
                     }
                     else if (ret < 0) { // delete
