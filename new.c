@@ -46,6 +46,84 @@ t_client *ft_create_new_client(t_client *prev, int fd, int id) {
     return (new);
 }
 
+void ft_add_new_send_msg(t_client *current, char *msg, int free_flag) {
+    char *tmp;
+
+    tmp = current->send_msg;
+    if (tmp == NULL) {
+        current->send_msg = (char *)malloc(sizeof(char) * strlen(msg) + 1);
+        strcpy(current->send_msg, msg);
+    }
+    else {
+        current->send_msg = (char *)malloc(sizeof(char) * (strlen(current->send_msg) + strlen(msg) + 1));
+        size_t i = 0;
+        for (; tmp[i]; i++){
+            current->send_msg[i] = tmp[i];
+        }
+        for (size_t n = 0; msg[n]; n++) {
+            current->send_msg[i++] = msg[n];
+        }
+        current->send_msg[i] = '\0';
+    }
+    current->remained_send = strlen(current->send_msg);
+    if (tmp != NULL)
+        free(tmp);
+    if (free_flag)
+        free(msg);
+}
+
+char * ft_edit_msg_for_send(int id, char *msg) {
+    char *new;
+    char *tmp;
+    int num_lines;
+
+    tmp = (char *)malloc(sizeof(char) * (strlen("client d: ") + 10)); // int can contain max 10 digits 
+    sprintf(tmp, "client %d: ", id);
+    
+    num_lines = 1;
+    for (size_t i = 0; msg[i]; i++) {
+        if (msg[i] == '\n')
+            num_lines++;
+    }
+
+    new = (char *)malloc(sizeof(char) * (strlen(msg) + (num_lines * strlen(tmp)) + 1));
+    
+    size_t i = 0;
+    for (size_t n = 0; tmp[n]; n++) {
+        new[i++] = tmp[n];
+    }
+    for (size_t k = 0; msg[k]; k++) {
+        if (k > 0 && msg[k - 1] == '\n') {
+            for (size_t n = 0; tmp[n]; n++) {
+                new[i++] = tmp[n];
+            }
+            new[i++] = msg[k];
+            continue;
+        }
+        new[i++] = msg[k];
+    }
+    new[i] = '\0';
+    free(tmp);
+    return(new);
+}
+
+void ft_copy_recv_buffer(t_client *current, char *buf) {
+    char * tmp;
+    
+    tmp = current->recv_msg;
+    current->recv_msg = (char *)malloc(sizeof(char) * strlen(buf) + 1);
+    
+    if (current->recv_msg == NULL) {
+        printf("copy recv buffer ");
+        write(2, "Fatal error\n", 12); exit(1);
+    }
+    
+    strcpy(current->recv_msg, buf);
+    
+    if (tmp != NULL)
+        free(tmp);
+}
+
 int main(int argc, char **argv) {
     int sock_fd, ret, last_id = 0;
     struct sockaddr_in addr, client;
@@ -137,22 +215,62 @@ int main(int argc, char **argv) {
                 for (; tmp->next != NULL; tmp = tmp->next) {}
                 tmp->next = ft_create_new_client(tmp, fd, last_id++);
             }
-            // current = tmp;
-            // sprintf(buf, "server: client %d just arrived\n", last_id - 1);
-            // for (; tmp != NULL; tmp = tmp->prev) {
-            //     ft_add_new_send_msg(tmp, buf, 0);
-            // }
-            // tmp = current;
-            // continue;
+            current = tmp;
+            sprintf(buf, "server: client %d just arrived\n", last_id - 1);
+            for (; tmp != NULL; tmp = tmp->prev) {
+                if (!tmp->removed && tmp->id != last_id - 1)
+                    ft_add_new_send_msg(tmp, buf, 0);
+            }
+            tmp = current;
+            continue;
         }
         for (tmp = head; tmp != NULL; ) {
             fd = tmp->fd;
             if (!tmp->removed) {
                 if (FD_ISSET(fd, &readfds)) {
                     printf("%d READ_AVAILABLE\n", fd);
+                    bzero(buf, buffer_size + 1);
+                    ret = recv(fd, buf, buffer_size, 0);
+
+                    if (ret == 0) {
+                        tmp->removed = 1;
+                        current = tmp;
+                        sprintf(buf, "server: client %d just left\n", current->id);
+                        for (tmp = head; tmp != NULL; tmp = tmp->next) {
+                            if (!tmp->removed) {
+                                ft_add_new_send_msg(tmp, buf, 0);
+                            }
+                        }
+                        tmp = current;
+                        tmp = tmp->next;
+                        continue ;
+                    }
+                    else if (ret < 0) { // delete
+                        printf("recv ");
+                        write(2, "Fatal error\n", 12); exit(1);
+                    }
+                    buf[ret] = '\0';
+                    printf("buf\n%s", buf);
+                    ft_copy_recv_buffer(tmp, buf);
+                    current = tmp;
+                    for (tmp = head; tmp != NULL; tmp = tmp->next) {
+                        if (tmp->fd != current->fd && !tmp->removed)
+                            ft_add_new_send_msg(tmp, ft_edit_msg_for_send(current->id, current->recv_msg), 1);
+                    }
+                    tmp = current;
                 }
                 if (FD_ISSET(fd, &writefds)) {
-                    printf("%d WRITE_AVAILABLE\n", fd);
+                    if (!tmp->removed) {
+                        printf("%d WRITE_AVAILABLE\n", fd);
+                        already_sent = strlen(tmp->send_msg) - tmp->remained_send;
+                        ret = send(tmp->fd, tmp->send_msg + already_sent, tmp->remained_send, 0);
+                        if (ret != -1)
+                            tmp->remained_send -= ret;
+                        if (tmp->remained_send <= 0) {
+                            free(tmp->send_msg);
+                            tmp->send_msg = NULL;
+                        }
+                    }
                 }
             }
             tmp = tmp->next;
