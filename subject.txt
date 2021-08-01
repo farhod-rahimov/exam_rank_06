@@ -27,7 +27,8 @@ clients must be able to send messages to your program.
 - when the server receive a message, it must resend it to all the other client with "client %d: " before every line!
 
 When a client disconnect from the server:
-- a message is sent to all the client that was connected to the server: "server: client %d just left\n"
+- a
+he server: "server: client %d just left\n"
 
 Memory or fd leaks are forbidden
 
