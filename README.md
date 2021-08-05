@@ -1,4 +1,4 @@
-# exam_rank_06
+# ExamRank06
 
 100% working
 
