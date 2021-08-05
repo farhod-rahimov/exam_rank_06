@@ -208,4 +208,6 @@ void ft_edit_and_send_msg(t_client *head, t_client *current, char *buf, fd_set w
     }
     new_msg[i] = '\0';
     ft_send_msg_to_all(head, current, new_msg, writefds);
+    free(new_msg);
+    free(prefix);
 }
